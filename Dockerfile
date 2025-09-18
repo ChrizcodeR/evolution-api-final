@@ -34,8 +34,20 @@ RUN mkdir -p ./public ./src ./prisma ./manager
 # Copiar código fuente
 COPY ./src ./src
 
-# Copiar directorio public (asegurar que existe)
-COPY ./public ./public
+# Copiar directorio public con verificación
+RUN if [ -d "./public" ]; then \
+        echo "Directorio public existe localmente"; \
+        cp -r ./public ./public_backup || true; \
+    else \
+        echo "Directorio public no existe localmente, creando uno vacío"; \
+        mkdir -p ./public; \
+    fi
+
+# Intentar copiar public desde el contexto de build
+COPY ./public* ./public/ 2>/dev/null || echo "No se pudo copiar public, usando directorio vacío"
+
+# Verificar que public existe y tiene contenido
+RUN ls -la ./public/ || echo "Directorio public vacío o no existe"
 
 # Copiar resto de archivos
 COPY ./prisma ./prisma
@@ -45,39 +57,58 @@ COPY ./runWithProvider.js ./
 # Copiar archivo de entorno
 COPY ./.env.example ./.env
 
+# Copiar scripts de Docker
 COPY ./Docker ./Docker
 
+# Hacer ejecutables los scripts
 RUN chmod +x ./Docker/scripts/* && dos2unix ./Docker/scripts/*
 
+# Generar configuración de base de datos
 RUN ./Docker/scripts/generate_database.sh
 
+# Construir la aplicación
 RUN npm run build
 
+# Imagen final optimizada
 FROM node:20-alpine AS final
 
+# Instalar dependencias mínimas
 RUN apk update && \
-    apk add tzdata ffmpeg bash openssl
+    apk add --no-cache tzdata ffmpeg bash openssl curl
 
-ENV TZ=America/Sao_Paulo
+# Configurar zona horaria
+ENV TZ=UTC
 ENV DOCKER_ENV=true
+ENV NODE_ENV=production
 
 WORKDIR /evolution
 
+# Copiar archivos necesarios
 COPY --from=builder /evolution/package.json ./package.json
 COPY --from=builder /evolution/package-lock.json ./package-lock.json
-
 COPY --from=builder /evolution/node_modules ./node_modules
 COPY --from=builder /evolution/dist ./dist
 COPY --from=builder /evolution/prisma ./prisma
 COPY --from=builder /evolution/manager ./manager
 COPY --from=builder /evolution/public ./public
-COPY --from=builder /evolution/.env ./.env
 COPY --from=builder /evolution/Docker ./Docker
 COPY --from=builder /evolution/runWithProvider.js ./runWithProvider.js
 COPY --from=builder /evolution/tsup.config.ts ./tsup.config.ts
+COPY --from=builder /evolution/.env ./.env
 
-ENV DOCKER_ENV=true
+# Crear directorio para instancias
+RUN mkdir -p /evolution/instances
 
+# Configurar permisos
+RUN chown -R node:node /evolution
+USER node
+
+# Exponer puerto
 EXPOSE 8080
 
-ENTRYPOINT ["/bin/bash", "-c", ". ./Docker/scripts/deploy_database.sh && npm run start:prod" ]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/manager || exit 1
+
+# Comando de inicio
+ENTRYPOINT ["/bin/bash", "-c", ". ./Docker/scripts/deploy_database.sh && npm run start:prod"]
