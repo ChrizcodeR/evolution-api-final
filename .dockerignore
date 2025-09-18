@@ -153,12 +153,10 @@ Thumbs.db
 .gitignore
 
 # Docker
-Dockerfile*
 docker-compose*
 .dockerignore
 
-# Railway
-railway.json
+# Railway setup script
 railway-setup.sh
 
 # Documentation
