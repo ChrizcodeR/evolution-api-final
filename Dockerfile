@@ -34,20 +34,8 @@ RUN mkdir -p ./public ./src ./prisma ./manager
 # Copiar código fuente
 COPY ./src ./src
 
-# Copiar directorio public con verificación
-RUN if [ -d "./public" ]; then \
-        echo "Directorio public existe localmente"; \
-        cp -r ./public ./public_backup || true; \
-    else \
-        echo "Directorio public no existe localmente, creando uno vacío"; \
-        mkdir -p ./public; \
-    fi
-
-# Intentar copiar public desde el contexto de build
-COPY ./public* ./public/ 2>/dev/null || echo "No se pudo copiar public, usando directorio vacío"
-
-# Verificar que public existe y tiene contenido
-RUN ls -la ./public/ || echo "Directorio public vacío o no existe"
+# Copiar directorio public
+COPY ./public ./public
 
 # Copiar resto de archivos
 COPY ./prisma ./prisma
