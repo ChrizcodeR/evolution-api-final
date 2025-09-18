@@ -1,5 +1,7 @@
+# Dockerfile optimizado para Railway
 FROM node:20-alpine AS builder
 
+# Instalar dependencias del sistema
 RUN apk update && \
     apk add --no-cache git ffmpeg wget curl bash openssl python3 make g++
 
@@ -14,6 +16,7 @@ RUN npm config set registry https://registry.npmjs.org/ && \
     npm config set fetch-retry-maxtimeout 120000 && \
     npm config set fetch-retries 3
 
+# Copiar archivos de configuración
 COPY ./package*.json ./
 COPY ./tsconfig.json ./
 COPY ./tsup.config.ts ./
@@ -25,18 +28,22 @@ RUN npm ci --silent --no-audit --no-fund --prefer-offline || \
     (echo "npm install failed, trying with legacy peer deps..." && \
      npm install --silent --no-audit --no-fund --legacy-peer-deps)
 
+# Crear directorios necesarios
+RUN mkdir -p ./public ./src ./prisma ./manager
+
 # Copiar código fuente
 COPY ./src ./src
 
-# Crear directorio public y copiar contenido
-RUN mkdir -p ./public
+# Copiar directorio public (asegurar que existe)
 COPY ./public ./public
 
 # Copiar resto de archivos
 COPY ./prisma ./prisma
 COPY ./manager ./manager
-COPY ./.env.example ./.env
 COPY ./runWithProvider.js ./
+
+# Copiar archivo de entorno
+COPY ./.env.example ./.env
 
 COPY ./Docker ./Docker
 
