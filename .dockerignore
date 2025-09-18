@@ -155,6 +155,7 @@ Thumbs.db
 # Docker
 docker-compose*
 .dockerignore
+Dockerfile.railway
 
 # Railway setup script
 railway-setup.sh
